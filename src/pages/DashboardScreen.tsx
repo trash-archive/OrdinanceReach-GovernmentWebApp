@@ -1,6 +1,9 @@
-import { FileText, Building2, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
+import { FileText, Building2, Clock, AlertTriangle, ArrowRight, ShieldAlert } from 'lucide-react';
 import { StatCard, Card, StatusBadge, ComplianceBadge } from '../components/UI';
 import { ordinances, departments, notifications } from '../data/mockData';
+
+// Fixed demo date — same as compliance screen
+const TODAY_ISO = '2024-05-27';
 
 interface DashboardProps {
   onNavigate: (s: any) => void;
@@ -9,11 +12,17 @@ interface DashboardProps {
 const recentOrds = ordinances.filter(o => o.status === 'active').slice(0, 4);
 const recentDepts = departments.slice(0, 5);
 
+// Overdue: delayed/pending/in-progress departments whose last update is old enough
+// We simulate this by checking if any dept has compliance !== compliant and was last updated > 30 days ago
+// For demo purposes we flag Business Permits (id=4) and City Engineering (id=6) as overdue
+const OVERDUE_DEPT_IDS = new Set(['4', '6']);
+
 export default function DashboardScreen({ onNavigate }: DashboardProps) {
   const activeCount = ordinances.filter(o => o.status === 'active').length;
   const draftCount = ordinances.filter(o => o.status === 'draft').length;
   const delayedDepts = departments.filter(d => d.compliance === 'delayed').length;
   const compliantDepts = departments.filter(d => d.compliance === 'compliant').length;
+  const overdueDepts = departments.filter(d => OVERDUE_DEPT_IDS.has(d.id)).length;
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -67,11 +76,11 @@ export default function DashboardScreen({ onNavigate }: DashboardProps) {
           icon={<Building2 size={18} />}
         />
         <StatCard
-          label="Delayed Implementations"
-          value={delayedDepts}
-          sub="Requires attention"
-          accent="var(--rose)"
-          icon={<AlertTriangle size={18} />}
+          label="Overdue Reports"
+          value={overdueDepts}
+          sub="Past compliance deadline"
+          accent="#dc2626"
+          icon={<ShieldAlert size={18} />}
         />
         <StatCard
           label="Drafts in Queue"
@@ -81,6 +90,30 @@ export default function DashboardScreen({ onNavigate }: DashboardProps) {
           icon={<Clock size={18} />}
         />
       </div>
+
+      {/* Overdue alert banner */}
+      {overdueDepts > 0 && (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
+          padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <AlertTriangle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#991b1b' }}>
+              {overdueDepts} department{overdueDepts > 1 ? 's have' : ' has'} overdue compliance reports
+            </div>
+            <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>
+              These offices have missed their deadlines. Send reminders or escalate via the Compliance Tracking screen.
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate('compliance')}
+            style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Review Now
+          </button>
+        </div>
+      )}
 
       {/* Main content */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 20 }}>
@@ -237,7 +270,14 @@ export default function DashboardScreen({ onNavigate }: DashboardProps) {
             <tbody>
               {recentDepts.map((dept, i) => (
                 <tr key={dept.id} style={{ borderTop: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(235,241,255,0.3)' }}>
-                  <td style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--navy)' }}>{dept.name}</td>
+                  <td style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--navy)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {dept.name}
+                      {OVERDUE_DEPT_IDS.has(dept.id) && (
+                        <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>OVERDUE</span>
+                      )}
+                    </div>
+                  </td>
                   <td style={{ padding: '12px 20px', color: 'var(--slate)' }}>{dept.head}</td>
                   <td style={{ padding: '12px 20px', fontFamily: "'DM Mono', monospace", color: 'var(--navy)' }}>{dept.assignedCount}</td>
                   <td style={{ padding: '12px 20px', fontFamily: "'DM Mono', monospace", color: 'var(--navy)' }}>
@@ -245,7 +285,9 @@ export default function DashboardScreen({ onNavigate }: DashboardProps) {
                       {dept.completedCount}/{dept.assignedCount}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 20px' }}><ComplianceBadge status={dept.compliance} /></td>
+                  <td style={{ padding: '12px 20px' }}>
+                    <ComplianceBadge status={OVERDUE_DEPT_IDS.has(dept.id) ? 'overdue' : dept.compliance} />
+                  </td>
                   <td style={{ padding: '12px 20px', color: 'var(--slate)', fontSize: 12 }}>{dept.lastUpdate}</td>
                 </tr>
               ))}

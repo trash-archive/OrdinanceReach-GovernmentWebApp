@@ -10,10 +10,13 @@ interface DeptNotificationsScreenProps {
 }
 
 const typeConfig = {
-  new_ordinance: { icon: <FileText size={15} />, bg: 'rgba(16,185,129,0.1)', color: '#10B981', label: 'New Assignment' },
-  reminder:      { icon: <Clock size={15} />,    bg: '#FEF3C7',               color: '#B45309', label: 'Reminder'       },
-  overdue:       { icon: <AlertTriangle size={15} />, bg: '#FEE2E2',          color: '#EF4444', label: 'Overdue'        },
-  acknowledged:  { icon: <CheckCircle size={15} />, bg: '#D1FAE5',            color: '#059669', label: 'Acknowledged'   },
+  new_ordinance:      { icon: <FileText size={15} />,      bg: 'rgba(16,185,129,0.1)', color: '#10B981', label: 'New Assignment'    },
+  reminder:           { icon: <Clock size={15} />,          bg: '#FEF3C7',              color: '#B45309', label: 'Reminder'          },
+  overdue:            { icon: <AlertTriangle size={15} />,  bg: '#FEE2E2',              color: '#EF4444', label: 'Overdue'           },
+  acknowledged:       { icon: <CheckCircle size={15} />,    bg: '#D1FAE5',              color: '#059669', label: 'Acknowledged'      },
+  extension_approved: { icon: <CheckCircle size={15} />,    bg: '#D1FAE5',              color: '#059669', label: 'Extension Approved' },
+  extension_denied:   { icon: <AlertTriangle size={15} />,  bg: '#FEE2E2',              color: '#EF4444', label: 'Extension Denied'  },
+  escalated:          { icon: <AlertTriangle size={15} />,  bg: '#ede9fe',              color: '#7c3aed', label: 'Escalated'         },
 };
 
 export default function DeptNotificationsScreen({ notifications, onMarkAllRead, onMarkRead, onNavigate }: DeptNotificationsScreenProps) {

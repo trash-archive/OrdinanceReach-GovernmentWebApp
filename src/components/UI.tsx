@@ -17,14 +17,16 @@ export function StatusBadge({ status }: { status: OrdStatus }) {
   );
 }
 
-export function ComplianceBadge({ status }: { status: ComplianceStatus }) {
-  const cfg: Record<ComplianceStatus, { bg: string; color: string; label: string }> = {
-    compliant:    { bg: 'var(--emerald-light)', color: 'var(--emerald)', label: '✓ Compliant' },
-    'in-progress': { bg: 'var(--sky)', color: 'var(--blue)', label: '↻ In Progress' },
-    delayed:      { bg: 'var(--rose-light)', color: 'var(--rose)', label: '⚠ Delayed' },
-    pending:      { bg: 'var(--amber-light)', color: '#B45309', label: '○ Pending' },
+export function ComplianceBadge({ status }: { status: ComplianceStatus | 'overdue' | 'escalated' }) {
+  const cfg: Record<string, { bg: string; color: string; label: string }> = {
+    compliant:    { bg: 'var(--emerald-light)', color: 'var(--emerald)', label: '✓ Compliant'   },
+    'in-progress': { bg: 'var(--sky)',          color: 'var(--blue)',    label: '↻ In Progress' },
+    delayed:      { bg: 'var(--rose-light)',    color: 'var(--rose)',    label: '⚠ Delayed'     },
+    pending:      { bg: 'var(--amber-light)',   color: '#B45309',        label: '○ Pending'     },
+    overdue:      { bg: '#fee2e2',              color: '#dc2626',        label: '🔴 Overdue'    },
+    escalated:    { bg: '#ede9fe',              color: '#7c3aed',        label: '⬆ Escalated'  },
   };
-  const { bg, color, label } = cfg[status];
+  const { bg, color, label } = cfg[status] ?? cfg['pending'];
   return (
     <span style={{
       background: bg, color, fontSize: 11, fontWeight: 600,

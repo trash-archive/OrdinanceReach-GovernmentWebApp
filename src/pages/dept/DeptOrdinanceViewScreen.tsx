@@ -36,12 +36,19 @@ const catColors: Record<string, string> = {
   Zoning: '#FFF3E0', Education: '#E8F5E9',
 };
 
-const statusConfig = {
+const statusConfig: Record<string, { bg: string; color: string; icon: React.ReactNode; label: string }> = {
   compliant:     { bg: '#D1FAE5', color: '#059669', icon: <CheckCircle size={13} />,   label: 'Compliant'   },
   'in-progress': { bg: '#EBF1FF', color: '#3B7BF8', icon: <Clock size={13} />,         label: 'In Progress' },
   delayed:       { bg: '#FEE2E2', color: '#EF4444', icon: <AlertTriangle size={13} />, label: 'Delayed'     },
   pending:       { bg: '#FEF3C7', color: '#B45309', icon: <Circle size={13} />,        label: 'Pending'     },
+  overdue:       { bg: '#fee2e2', color: '#dc2626', icon: <AlertTriangle size={13} />, label: 'Overdue'     },
 };
+
+const TODAY_ISO = '2024-05-27';
+function isOverdue(ord: AssignedOrdinance) {
+  if (ord.complianceStatus === 'compliant') return false;
+  return ord.deadlineISO < TODAY_ISO;
+}
 
 // ─── Full-text builder (mirrors OrdinanceViewScreen logic) ────────────────────
 function buildSections(ord: AssignedOrdinance) {
@@ -121,7 +128,8 @@ export default function DeptOrdinanceViewScreen({
 }: DeptOrdinanceViewScreenProps) {
   const [tab, setTab] = useState<Tab>('fulltext');
   const sections = buildSections(ord);
-  const sc = statusConfig[ord.complianceStatus];
+  const overdue = isOverdue(ord);
+  const sc = statusConfig[overdue ? 'overdue' : ord.complianceStatus] ?? statusConfig['pending'];
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'fulltext',   label: 'Full Text',          icon: <FileText size={13} /> },
@@ -502,6 +510,23 @@ export default function DeptOrdinanceViewScreen({
                 borderRadius: 8, padding: '11px 16px', fontSize: 13, fontWeight: 600,
               }}>
                 <CheckCircle size={15} /> Fully compliant — no further action required.
+              </div>
+            )}
+
+            {/* Overdue warning */}
+            {overdue && (
+              <div style={{
+                marginTop: 14, display: 'flex', alignItems: 'center', gap: 10,
+                background: '#fef2f2', border: '1px solid #fecaca',
+                borderRadius: 8, padding: '11px 16px',
+              }}>
+                <AlertTriangle size={15} color="#dc2626" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#991b1b' }}>Compliance report is overdue</div>
+                  <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>
+                    Deadline was {ord.deadline}. Submit your report immediately or request an extension to avoid escalation to the City Council.
+                  </div>
+                </div>
               </div>
             )}
 

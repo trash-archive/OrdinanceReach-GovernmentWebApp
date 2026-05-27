@@ -12,7 +12,7 @@ import {
   ASSIGNED_ORDINANCES,
   DEPT_NOTIFICATIONS,
 } from '../data/deptHeadData';
-import type { AssignedOrdinance, DeptNotification } from '../data/deptHeadData';
+import type { AssignedOrdinance, DeptHeadUser, DeptNotification } from '../data/deptHeadData';
 
 type DeptScreen = 'dh-dashboard' | 'dh-ordinances' | 'dh-ordinance-view' | 'dh-compliance' | 'dh-notifications' | 'dh-profile';
 
@@ -32,6 +32,7 @@ interface DeptHeadAppProps {
 export default function DeptHeadApp({ onLogout }: DeptHeadAppProps) {
   const [screen, setScreen] = useState<DeptScreen>('dh-dashboard');
   const [collapsed, setCollapsed] = useState(false);
+  const [user, setUser] = useState<DeptHeadUser>(DEPT_HEAD_USER);
   const [ordinances, setOrdinances] = useState<AssignedOrdinance[]>(ASSIGNED_ORDINANCES);
   const [notifications, setNotifications] = useState<DeptNotification[]>(DEPT_NOTIFICATIONS);
   const [reportTarget, setReportTarget] = useState<AssignedOrdinance | null>(null);
@@ -62,12 +63,16 @@ export default function DeptHeadApp({ onLogout }: DeptHeadAppProps) {
     setScreen('dh-ordinance-view');
   }
 
+  function handleUpdateUser(updated: Partial<DeptHeadUser>) {
+    setUser(u => ({ ...u, ...updated }));
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F6F8FC' }}>
       <DeptSidebar
         active={screen}
         onNavigate={handleNavigate}
-        user={DEPT_HEAD_USER}
+        user={user}
         collapsed={collapsed}
         onToggle={() => setCollapsed(c => !c)}
         unreadCount={unreadCount}
@@ -76,7 +81,7 @@ export default function DeptHeadApp({ onLogout }: DeptHeadAppProps) {
         <DeptTopbar
           title={title}
           subtitle={subtitle}
-          user={DEPT_HEAD_USER}
+          user={user}
           unreadCount={unreadCount}
           onNavigate={handleNavigate}
           onLogout={onLogout}
@@ -84,7 +89,7 @@ export default function DeptHeadApp({ onLogout }: DeptHeadAppProps) {
         <main style={{ flex: 1, overflowY: 'auto' }}>
           {screen === 'dh-dashboard' && (
             <DeptDashboardScreen
-              user={DEPT_HEAD_USER}
+              user={user}
               ordinances={ordinances}
               onNavigate={handleNavigate}
             />
@@ -109,6 +114,7 @@ export default function DeptHeadApp({ onLogout }: DeptHeadAppProps) {
               ordinances={ordinances}
               selectedOrd={reportTarget}
               onClearSelected={() => setReportTarget(null)}
+              onOrdinancesUpdate={setOrdinances}
             />
           )}
           {screen === 'dh-notifications' && (
@@ -120,7 +126,7 @@ export default function DeptHeadApp({ onLogout }: DeptHeadAppProps) {
             />
           )}
           {screen === 'dh-profile' && (
-            <DeptProfileScreen user={DEPT_HEAD_USER} />
+            <DeptProfileScreen user={user} onUpdateUser={handleUpdateUser} />
           )}
         </main>
       </div>

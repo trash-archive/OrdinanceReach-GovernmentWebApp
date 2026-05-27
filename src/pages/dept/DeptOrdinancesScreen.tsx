@@ -9,11 +9,19 @@ interface DeptOrdinancesScreenProps {
   onViewOrdinance: (ord: AssignedOrdinance) => void;
 }
 
-const statusConfig = {
-  compliant:     { bg: '#D1FAE5', color: '#059669', icon: <CheckCircle size={14} />, label: 'Compliant'   },
-  'in-progress': { bg: '#EBF1FF', color: '#3B7BF8', icon: <Clock size={14} />,       label: 'In Progress' },
-  delayed:       { bg: '#FEE2E2', color: '#EF4444', icon: <AlertTriangle size={14} />, label: 'Delayed'   },
-  pending:       { bg: '#FEF3C7', color: '#B45309', icon: <Circle size={14} />,       label: 'Pending'    },
+const TODAY_ISO = '2024-05-27';
+
+function isOverdue(ord: AssignedOrdinance) {
+  if (ord.complianceStatus === 'compliant') return false;
+  return ord.deadlineISO < TODAY_ISO;
+}
+
+const statusConfig: Record<string, { bg: string; color: string; icon: React.ReactNode; label: string }> = {
+  compliant:     { bg: '#D1FAE5', color: '#059669', icon: <CheckCircle size={14} />,   label: 'Compliant'   },
+  'in-progress': { bg: '#EBF1FF', color: '#3B7BF8', icon: <Clock size={14} />,         label: 'In Progress' },
+  delayed:       { bg: '#FEE2E2', color: '#EF4444', icon: <AlertTriangle size={14} />, label: 'Delayed'     },
+  pending:       { bg: '#FEF3C7', color: '#B45309', icon: <Circle size={14} />,        label: 'Pending'     },
+  overdue:       { bg: '#fee2e2', color: '#dc2626', icon: <AlertTriangle size={14} />, label: 'Overdue'     },
 };
 
 const catColors: Record<string, string> = {
@@ -24,9 +32,14 @@ const catColors: Record<string, string> = {
 
 export default function DeptOrdinancesScreen({ ordinances, onNavigate, onSubmitReport, onViewOrdinance }: DeptOrdinancesScreenProps) {
   const [expanded, setExpanded] = useState<string | null>(ordinances.find(o => o.isNew)?.id ?? null);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'in-progress' | 'compliant'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'in-progress' | 'compliant' | 'overdue'>('all');
 
-  const filtered = ordinances.filter(o => filter === 'all' || o.complianceStatus === filter);
+  const overdueCount = ordinances.filter(isOverdue).length;
+  const filtered = ordinances.filter(o => {
+    if (filter === 'overdue') return isOverdue(o);
+    if (filter === 'all') return true;
+    return o.complianceStatus === filter;
+  });
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -36,6 +49,7 @@ export default function DeptOrdinancesScreen({ ordinances, onNavigate, onSubmitR
         <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>Show:</span>
         {[
           { value: 'all', label: `All (${ordinances.length})` },
+          { value: 'overdue', label: `Overdue${overdueCount > 0 ? ` (${overdueCount})` : ''}` },
           { value: 'pending', label: 'Action Needed' },
           { value: 'in-progress', label: 'In Progress' },
           { value: 'compliant', label: 'Compliant' },
@@ -58,19 +72,39 @@ export default function DeptOrdinancesScreen({ ordinances, onNavigate, onSubmitR
       {/* Ordinance cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filtered.map(ord => {
-          const sc = statusConfig[ord.complianceStatus];
+          const overdue = isOverdue(ord);
+          const sc = statusConfig[overdue ? 'overdue' : ord.complianceStatus] ?? statusConfig['pending'];
           const isOpen = expanded === ord.id;
 
           return (
             <div key={ord.id} style={{
-              background: '#fff', border: `1px solid ${ord.isNew ? 'rgba(16,185,129,0.3)' : '#E2E8F0'}`,
-              borderRadius: 12, overflow: 'hidden', boxShadow: ord.isNew ? '0 2px 12px rgba(16,185,129,0.08)' : '0 1px 4px rgba(15,31,61,0.07)',
+              background: '#fff',
+              border: `1px solid ${overdue ? '#fca5a5' : ord.isNew ? 'rgba(16,185,129,0.3)' : '#E2E8F0'}`,
+              borderRadius: 12, overflow: 'hidden',
+              boxShadow: overdue ? '0 2px 12px rgba(220,38,38,0.08)' : ord.isNew ? '0 2px 12px rgba(16,185,129,0.08)' : '0 1px 4px rgba(15,31,61,0.07)',
               transition: 'box-shadow 0.2s',
             }}>
+              {/* OVERDUE banner */}
+              {overdue && (
+                <div style={{ background: 'linear-gradient(90deg, #dc2626, #b91c1c)', padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle size={13} color="#fff" />
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', letterSpacing: '0.05em' }}>
+                    COMPLIANCE REPORT OVERDUE — Submit immediately or request an extension
+                  </span>
+                </div>
+              )}
               {/* NEW banner */}
-              {ord.isNew && (
+              {ord.isNew && !overdue && (
                 <div style={{ background: 'linear-gradient(90deg, #10B981, #059669)', padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: '#fff', letterSpacing: '0.05em' }}>🔔 NEW ORDINANCE ASSIGNED — Action Required</span>
+                </div>
+              )}
+              {/* Priority banner for urgent/immediate (non-overdue) */}
+              {!overdue && !ord.isNew && ord.priority !== 'normal' && (
+                <div style={{ background: ord.priority === 'immediate' ? '#fef2f2' : '#fffbeb', padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: `1px solid ${ord.priority === 'immediate' ? '#fecaca' : '#fde68a'}` }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: ord.priority === 'immediate' ? '#dc2626' : '#B45309' }}>
+                    {ord.priority === 'immediate' ? '🔴 FOR IMMEDIATE ACTION' : '🟡 URGENT PRIORITY'}
+                  </span>
                 </div>
               )}
 
@@ -101,7 +135,8 @@ export default function DeptOrdinancesScreen({ ordinances, onNavigate, onSubmitR
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 10.5, color: '#94A3B8', marginBottom: 2 }}>Deadline</div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#0F1F3D' }}>{ord.deadline}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: overdue ? '#dc2626' : '#0F1F3D' }}>{ord.deadline}</div>
+                  {overdue && <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 700, marginTop: 2 }}>OVERDUE</div>}
                   <div style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 6 }}>Assigned {ord.dateAssigned}</div>
                 </div>
                 <div style={{ marginTop: 2 }}>
