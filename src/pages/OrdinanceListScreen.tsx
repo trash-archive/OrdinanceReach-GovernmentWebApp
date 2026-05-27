@@ -10,13 +10,14 @@ import { StatusBadge, CategoryBadge, StatCard, Card } from '../components/UI';
 
 interface OrdinanceListScreenProps {
   onNavigate: (s: any) => void;
+  onViewOrdinance: (ord: Ordinance) => void;
 }
 
 const PER_PAGE = 8;
 
 type SortField = 'number' | 'title' | 'category' | 'status' | 'datePassed' | 'author';
 
-export default function OrdinanceListScreen({ onNavigate }: OrdinanceListScreenProps) {
+export default function OrdinanceListScreen({ onNavigate, onViewOrdinance }: OrdinanceListScreenProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrdStatus | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -324,7 +325,7 @@ export default function OrdinanceListScreen({ onNavigate }: OrdinanceListScreenP
       </Card>
 
       {/* ── Detail Panel ── */}
-      {selected && <DetailPanel ord={selected} onClose={() => setSelected(null)} />}
+      {selected && <DetailPanel ord={selected} onClose={() => setSelected(null)} onViewFull={onViewOrdinance} />}
     </div>
   );
 }
@@ -439,7 +440,7 @@ function GridCard({ ord, onSelect }: { ord: Ordinance; onSelect: (o: Ordinance) 
   );
 }
 
-function DetailPanel({ ord, onClose }: { ord: Ordinance; onClose: () => void }) {
+function DetailPanel({ ord, onClose, onViewFull }: { ord: Ordinance; onClose: () => void; onViewFull: (ord: Ordinance) => void }) {
   return (
     <>
       {/* Backdrop */}
@@ -507,7 +508,6 @@ function DetailPanel({ ord, onClose }: { ord: Ordinance; onClose: () => void }) 
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
           <button
-            onClick={onClose}
             style={{
               flex: 1, padding: 10, borderRadius: 8, fontSize: 13, fontWeight: 600,
               cursor: 'pointer', background: 'var(--sky)', color: 'var(--navy)',
@@ -517,6 +517,7 @@ function DetailPanel({ ord, onClose }: { ord: Ordinance; onClose: () => void }) 
             Edit Metadata
           </button>
           <button
+            onClick={() => onViewFull(ord)}
             style={{
               flex: 1, padding: 10, borderRadius: 8, fontSize: 13, fontWeight: 600,
               cursor: 'pointer', background: 'var(--blue)', color: '#fff',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import LoginScreen from './pages/LoginScreen';
 import DashboardScreen from './pages/DashboardScreen';
 import OrdinanceListScreen from './pages/OrdinanceListScreen';
+import OrdinanceViewScreen from './pages/OrdinanceViewScreen';
 import EncodeOrdinanceScreen from './pages/EncodeOrdinanceScreen';
 import DepartmentsScreen from './pages/DepartmentsScreen';
 import ComplianceTrackingScreen from './pages/ComplianceTrackingScreen';
@@ -9,31 +10,35 @@ import NotificationsScreen from './pages/NotificationsScreen';
 import ReportsScreen from './pages/ReportsScreen';
 import UsersScreen from './pages/UsersScreen';
 import AuditLogsScreen from './pages/AuditLogsScreen';
+import DeptHeadApp from './pages/DeptHeadApp';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
+import type { Ordinance } from './data/mockData';
 
 type Screen =
-  | 'login' | 'dashboard' | 'ordinances' | 'encode'
+  | 'login' | 'dashboard' | 'ordinances' | 'ordinance-view' | 'encode'
   | 'notifications' | 'departments' | 'compliance'
   | 'reports' | 'users' | 'audit';
 
 const screenTitles: Record<Screen, { title: string; subtitle?: string }> = {
-  login:         { title: 'Login' },
-  dashboard:     { title: 'Dashboard', subtitle: 'Overview of ordinances, compliance, and alerts' },
-  ordinances:    { title: 'Ordinance List', subtitle: 'All ordinances in the repository' },
-  encode:        { title: 'Encode Ordinance', subtitle: 'Create and publish a new ordinance' },
-  notifications: { title: 'Notifications', subtitle: 'Alerts and system messages' },
-  departments:   { title: 'Department Assignments', subtitle: 'Manage office responsibilities' },
-  compliance:    { title: 'Compliance Tracking', subtitle: 'Monitor implementation status per department' },
-  reports:       { title: 'Reports & Analytics', subtitle: 'Ordinance effectiveness and compliance rates' },
-  users:         { title: 'User Management', subtitle: 'Manage system users and roles' },
-  audit:         { title: 'Audit Logs', subtitle: 'System activity and change history' },
+  login:            { title: 'Login' },
+  dashboard:        { title: 'Dashboard', subtitle: 'Overview of ordinances, compliance, and alerts' },
+  ordinances:       { title: 'Ordinance List', subtitle: 'All ordinances in the repository' },
+  'ordinance-view': { title: 'View Ordinance', subtitle: 'Full document and details' },
+  encode:           { title: 'Encode Ordinance', subtitle: 'Create and publish a new ordinance' },
+  notifications:    { title: 'Notifications', subtitle: 'Alerts and system messages' },
+  departments:      { title: 'Department Assignments', subtitle: 'Manage office responsibilities' },
+  compliance:       { title: 'Compliance Tracking', subtitle: 'Monitor implementation status per department' },
+  reports:          { title: 'Reports & Analytics', subtitle: 'Ordinance effectiveness and compliance rates' },
+  users:            { title: 'User Management', subtitle: 'Manage system users and roles' },
+  audit:            { title: 'Audit Logs', subtitle: 'System activity and change history' },
 };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('login');
   const [role, setRole] = useState('encoder');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [viewedOrdinance, setViewedOrdinance] = useState<Ordinance | null>(null);
 
   function handleLogin(selectedRole: string) {
     setRole(selectedRole);
@@ -44,24 +49,37 @@ export default function App() {
     setScreen(s);
   }
 
+  function handleViewOrdinance(ord: Ordinance) {
+    setViewedOrdinance(ord);
+    setScreen('ordinance-view');
+  }
+
   if (screen === 'login') {
     return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  // Department Head gets their own isolated app shell
+  if (role === 'department_head') {
+    return <DeptHeadApp onLogout={() => { setRole('encoder'); setScreen('login'); }} />;
   }
 
   const { title, subtitle } = screenTitles[screen] ?? { title: '' };
 
   function renderScreen() {
     switch (screen) {
-      case 'dashboard':    return <DashboardScreen onNavigate={handleNavigate} />;
-      case 'ordinances':   return <OrdinanceListScreen onNavigate={handleNavigate} />;
-      case 'encode':       return <EncodeOrdinanceScreen onNavigate={handleNavigate} />;
-      case 'departments':  return <DepartmentsScreen onNavigate={handleNavigate} />;
-      case 'compliance':   return <ComplianceTrackingScreen onNavigate={handleNavigate} />;
-      case 'notifications':return <NotificationsScreen onNavigate={handleNavigate} />;
-      case 'reports':      return <ReportsScreen onNavigate={handleNavigate} />;
-      case 'users':        return <UsersScreen onNavigate={handleNavigate} />;
-      case 'audit':        return <AuditLogsScreen onNavigate={handleNavigate} />;
-      default:             return null;
+      case 'dashboard':       return <DashboardScreen onNavigate={handleNavigate} />;
+      case 'ordinances':      return <OrdinanceListScreen onNavigate={handleNavigate} onViewOrdinance={handleViewOrdinance} />;
+      case 'ordinance-view':  return viewedOrdinance
+                                ? <OrdinanceViewScreen ordinance={viewedOrdinance} onNavigate={handleNavigate} />
+                                : null;
+      case 'encode':          return <EncodeOrdinanceScreen onNavigate={handleNavigate} />;
+      case 'departments':     return <DepartmentsScreen onNavigate={handleNavigate} />;
+      case 'compliance':      return <ComplianceTrackingScreen onNavigate={handleNavigate} />;
+      case 'notifications':   return <NotificationsScreen onNavigate={handleNavigate} />;
+      case 'reports':         return <ReportsScreen onNavigate={handleNavigate} />;
+      case 'users':           return <UsersScreen onNavigate={handleNavigate} />;
+      case 'audit':           return <AuditLogsScreen onNavigate={handleNavigate} />;
+      default:                return null;
     }
   }
 
