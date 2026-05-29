@@ -1,9 +1,5 @@
 import { FileText, Building2, Clock, AlertTriangle, ArrowRight, ShieldAlert } from 'lucide-react';
-import { StatCard, Card, StatusBadge, ComplianceBadge } from '../components/UI';
 import { ordinances, departments, notifications } from '../data/mockData';
-
-// Fixed demo date — same as compliance screen
-const TODAY_ISO = '2024-05-27';
 
 interface DashboardProps {
   onNavigate: (s: any) => void;
@@ -11,290 +7,397 @@ interface DashboardProps {
 
 const recentOrds = ordinances.filter(o => o.status === 'active').slice(0, 4);
 const recentDepts = departments.slice(0, 5);
-
-// Overdue: delayed/pending/in-progress departments whose last update is old enough
-// We simulate this by checking if any dept has compliance !== compliant and was last updated > 30 days ago
-// For demo purposes we flag Business Permits (id=4) and City Engineering (id=6) as overdue
 const OVERDUE_DEPT_IDS = new Set(['4', '6']);
+
+// ─── Badge helpers ────────────────────────────────────────────────────────────
+
+const STATUS_CFG: Record<string, { bg: string; color: string; label: string }> = {
+  active:    { bg: '#f0fdf4', color: '#15803d', label: 'Active' },
+  draft:     { bg: '#f8fafc', color: '#475569', label: 'Draft' },
+  amended:   { bg: '#fffbeb', color: '#a16207', label: 'Amended' },
+  repealed:  { bg: '#fef2f2', color: '#dc2626', label: 'Repealed' },
+};
+
+const COMPLIANCE_CFG: Record<string, { bg: string; color: string; label: string }> = {
+  compliant:    { bg: '#f0fdf4', color: '#15803d',  label: 'Compliant'    },
+  'in-progress':{ bg: '#eff6ff', color: '#2563eb',  label: 'In Progress'  },
+  delayed:      { bg: '#fef2f2', color: '#dc2626',  label: 'Delayed'      },
+  pending:      { bg: '#fffbeb', color: '#a16207',  label: 'Pending'      },
+  overdue:      { bg: '#fef2f2', color: '#dc2626',  label: 'Overdue'      },
+  escalated:    { bg: '#f5f3ff', color: '#7c3aed',  label: 'Escalated'    },
+};
+
+function StatusPill({ status }: { status: string }) {
+  const cfg = STATUS_CFG[status] ?? STATUS_CFG.draft;
+  return (
+    <span style={{
+      background: cfg.bg,
+      color: cfg.color,
+      fontSize: 11,
+      fontWeight: 500,
+      padding: '2px 8px',
+      borderRadius: 4,
+      whiteSpace: 'nowrap',
+    }}>{cfg.label}</span>
+  );
+}
+
+function CompliancePill({ status }: { status: string }) {
+  const cfg = COMPLIANCE_CFG[status] ?? COMPLIANCE_CFG.pending;
+  return (
+    <span style={{
+      background: cfg.bg,
+      color: cfg.color,
+      fontSize: 11,
+      fontWeight: 500,
+      padding: '2px 8px',
+      borderRadius: 4,
+      whiteSpace: 'nowrap',
+    }}>{cfg.label}</span>
+  );
+}
+
+// ─── Stat card ────────────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+  subColor?: string;
+  iconBg: string;
+  iconColor: string;
+  icon: React.ReactNode;
+  valueColor?: string;
+}
+
+function StatCard({ label, value, sub, subColor, iconBg, iconColor, icon, valueColor }: StatCardProps) {
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      padding: '14px 16px',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{label}</span>
+        <div style={{
+          width: 28, height: 28, borderRadius: 7,
+          background: iconBg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: iconColor, flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 500, color: valueColor ?? 'var(--color-text-primary)', lineHeight: 1 }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 11.5, color: subColor ?? 'var(--color-text-secondary)', marginTop: 5 }}>
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen({ onNavigate }: DashboardProps) {
   const activeCount = ordinances.filter(o => o.status === 'active').length;
-  const draftCount = ordinances.filter(o => o.status === 'draft').length;
-  const delayedDepts = departments.filter(d => d.compliance === 'delayed').length;
-  const compliantDepts = departments.filter(d => d.compliance === 'compliant').length;
-  const overdueDepts = departments.filter(d => OVERDUE_DEPT_IDS.has(d.id)).length;
+  const draftCount  = ordinances.filter(o => o.status === 'draft').length;
+  const overdueDepts    = departments.filter(d => OVERDUE_DEPT_IDS.has(d.id)).length;
+  const compliantDepts  = departments.filter(d => d.compliance === 'compliant').length;
+  const inProgressDepts = departments.filter(d => d.compliance === 'in-progress').length;
+  const delayedDepts    = departments.filter(d => d.compliance === 'delayed').length;
+  const pendingDepts    = departments.filter(d => d.compliance === 'pending').length;
+  const unreadNotifs    = notifications.filter(n => !n.read).length;
+
+  const complianceRows = [
+    { label: 'Compliant',   count: compliantDepts,  color: '#16a34a', pct: (compliantDepts / departments.length) * 100 },
+    { label: 'In progress', count: inProgressDepts, color: '#2563eb', pct: (inProgressDepts / departments.length) * 100 },
+    { label: 'Delayed',     count: delayedDepts,    color: '#dc2626', pct: (delayedDepts / departments.length) * 100 },
+    { label: 'Pending',     count: pendingDepts,    color: '#d97706', pct: (pendingDepts / departments.length) * 100 },
+  ];
+
+  const notifColors: Record<string, string> = {
+    success: '#16a34a',
+    warning: '#d97706',
+    info:    '#2563eb',
+    alert:   '#dc2626',
+  };
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Greeting */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, var(--blue) 100%)',
-        borderRadius: 'var(--radius)', padding: '24px 28px', color: '#fff',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        overflow: 'hidden', position: 'relative',
-      }}>
-        <div style={{
-          position: 'absolute', right: -30, top: -30, width: 200, height: 200,
-          borderRadius: '50%', background: 'rgba(59,123,248,0.15)',
-        }} />
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Fraunces', serif", marginBottom: 4 }}>
-            Good morning, M. Santos
-          </div>
-          <div style={{ fontSize: 13, opacity: 0.7 }}>
-            Monday, May 25, 2026 · Ordinance Encoder · City Council Office
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', position: 'relative' }}>
-          <div style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-            Pending Action
-          </div>
-          <div style={{
-            background: 'var(--amber)', color: 'var(--navy)',
-            borderRadius: 8, padding: '8px 16px',
-            fontSize: 13, fontWeight: 700,
-          }}>
-            2 Drafts Awaiting Publish
-          </div>
-        </div>
-      </div>
+    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100%' }}>
 
-      {/* Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <StatCard
-          label="Active Ordinances"
-          value={activeCount}
-          sub="↑ 3 this month"
-          accent="var(--emerald)"
-          icon={<FileText size={18} />}
-        />
-        <StatCard
-          label="Departments Assigned"
-          value={departments.length}
-          sub={`${compliantDepts} fully compliant`}
-          accent="var(--blue)"
-          icon={<Building2 size={18} />}
-        />
-        <StatCard
-          label="Overdue Reports"
-          value={overdueDepts}
-          sub="Past compliance deadline"
-          accent="#dc2626"
-          icon={<ShieldAlert size={18} />}
-        />
-        <StatCard
-          label="Drafts in Queue"
-          value={draftCount}
-          sub="Awaiting publication"
-          accent="var(--amber)"
-          icon={<Clock size={18} />}
-        />
-      </div>
-
-      {/* Overdue alert banner */}
+      {/* Overdue alert */}
       {overdueDepts > 0 && (
         <div style={{
-          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10,
-          padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: 8,
+          padding: '10px 14px',
         }}>
-          <AlertTriangle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#991b1b' }}>
-              {overdueDepts} department{overdueDepts > 1 ? 's have' : ' has'} overdue compliance reports
-            </div>
-            <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 2 }}>
-              These offices have missed their deadlines. Send reminders or escalate via the Compliance Tracking screen.
-            </div>
+          <AlertTriangle size={15} color="#dc2626" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 12.5, color: '#991b1b', fontWeight: 500 }}>
+            {overdueDepts} department{overdueDepts > 1 ? 's have' : ' has'} overdue compliance reports —
+            {' '}Business Permits, City Engineering
           </div>
           <button
             onClick={() => onNavigate('compliance')}
-            style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{
+              background: 'transparent',
+              border: '1px solid #fca5a5',
+              borderRadius: 6,
+              padding: '4px 10px',
+              fontSize: 12,
+              fontWeight: 500,
+              color: '#dc2626',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
           >
-            Review Now
+            Review
           </button>
         </div>
       )}
 
-      {/* Main content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 20 }}>
+      {/* Stat cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <StatCard
+          label="Active Ordinances"
+          value={activeCount}
+          sub="↑ 3 this month"
+          subColor="#16a34a"
+          iconBg="#f0fdf4"
+          iconColor="#16a34a"
+          icon={<FileText size={14} />}
+        />
+        <StatCard
+          label="Dept. Assigned"
+          value={departments.length}
+          sub={`${compliantDepts} fully compliant`}
+          iconBg="#eff6ff"
+          iconColor="#2563eb"
+          icon={<Building2 size={14} />}
+        />
+        <StatCard
+          label="Overdue Reports"
+          value={overdueDepts}
+          sub="Past deadline"
+          iconBg="#fef2f2"
+          iconColor="#dc2626"
+          valueColor={overdueDepts > 0 ? '#dc2626' : undefined}
+          icon={<ShieldAlert size={14} />}
+        />
+        <StatCard
+          label="Drafts in Queue"
+          value={draftCount}
+          sub="Awaiting publish"
+          iconBg="#fffbeb"
+          iconColor="#d97706"
+          icon={<Clock size={14} />}
+        />
+      </div>
+
+      {/* Main grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14 }}>
+
         {/* Recent ordinances */}
-        <Card>
-          <div style={{
-            padding: '16px 20px', borderBottom: '1px solid var(--border)',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>Recent Ordinances</div>
-              <div style={{ fontSize: 12, color: 'var(--slate)', marginTop: 2 }}>Latest passed & published</div>
-            </div>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Recent ordinances</span>
             <button
               onClick={() => onNavigate('ordinances')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4,
-                background: 'var(--sky)', border: '1px solid var(--border)',
-                borderRadius: 6, padding: '6px 12px', fontSize: 12, color: 'var(--blue)', fontWeight: 500,
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2563eb', background: 'transparent', border: 'none', cursor: 'pointer' }}
             >
               View all <ArrowRight size={12} />
             </button>
           </div>
           <div>
             {recentOrds.map((ord, i) => (
-              <div key={ord.id} style={{
-                padding: '14px 20px',
-                borderBottom: i < recentOrds.length - 1 ? '1px solid var(--border)' : 'none',
-                display: 'flex', alignItems: 'flex-start', gap: 14,
-                cursor: 'pointer',
-                transition: 'background 0.1s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--sky)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              <div
+                key={ord.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '11px 16px',
+                  borderBottom: i < recentOrds.length - 1 ? '1px solid var(--border)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <div style={{
-                  width: 36, height: 36, borderRadius: 8,
-                  background: 'var(--sky)', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <FileText size={16} color="var(--blue)" />
+                <div style={{ width: 32, height: 32, borderRadius: 7, background: 'var(--color-background-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={14} color="var(--color-text-secondary)" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--navy)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {ord.title}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: 'var(--slate)' }}>{ord.number}</span>
-                    <StatusBadge status={ord.status} />
-                    <span style={{ fontSize: 11, color: 'var(--slate)' }}>{ord.datePassed}</span>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 3, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>{ord.number}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>·</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{ord.datePassed}</span>
                   </div>
                 </div>
+                <StatusPill status={ord.status} />
               </div>
             ))}
           </div>
-        </Card>
+        </div>
 
         {/* Right column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Compliance summary */}
-          <Card>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>Compliance Overview</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Compliance overview */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Compliance</span>
+              <button
+                onClick={() => onNavigate('compliance')}
+                style={{ fontSize: 12, color: '#2563eb', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                Details <ArrowRight size={12} />
+              </button>
             </div>
-            <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'Compliant', count: compliantDepts, color: 'var(--emerald)', width: (compliantDepts / departments.length) * 100 },
-                { label: 'In Progress', count: departments.filter(d => d.compliance === 'in-progress').length, color: 'var(--blue)', width: (departments.filter(d => d.compliance === 'in-progress').length / departments.length) * 100 },
-                { label: 'Delayed', count: delayedDepts, color: 'var(--rose)', width: (delayedDepts / departments.length) * 100 },
-                { label: 'Pending', count: departments.filter(d => d.compliance === 'pending').length, color: 'var(--amber)', width: (departments.filter(d => d.compliance === 'pending').length / departments.length) * 100 },
-              ].map(item => (
-                <div key={item.label}>
+            <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {complianceRows.map(row => (
+                <div key={row.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: 'var(--slate)' }}>{item.label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)' }}>{item.count}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{row.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>{row.count}</span>
                   </div>
-                  <div style={{ height: 6, background: 'var(--sky)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${item.width}%`, background: item.color, borderRadius: 3, transition: 'width 0.6s' }} />
+                  <div style={{ height: 5, background: 'var(--color-background-secondary)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${row.pct}%`, background: row.color, borderRadius: 3, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
 
-          {/* Notifications */}
-          <Card style={{ flex: 1 }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>Alerts</div>
-              <span style={{
-                background: 'var(--rose-light)', color: 'var(--rose)',
-                fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
-              }}>
-                {notifications.filter(n => !n.read).length} new
-              </span>
+          {/* Alerts */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Alerts</span>
+              {unreadNotifs > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 500, background: '#fef2f2', color: '#dc2626', padding: '2px 7px', borderRadius: 4 }}>
+                  {unreadNotifs} new
+                </span>
+              )}
             </div>
             <div>
-              {notifications.slice(0, 4).map((notif, i) => {
-                const colors: Record<string, string> = {
-                  success: 'var(--emerald)', warning: 'var(--amber)',
-                  info: 'var(--blue)', alert: 'var(--rose)',
-                };
-                return (
-                  <div key={notif.id} style={{
-                    padding: '12px 20px',
+              {notifications.slice(0, 4).map((notif, i) => (
+                <div
+                  key={notif.id}
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    padding: '10px 16px',
                     borderBottom: i < 3 ? '1px solid var(--border)' : 'none',
-                    display: 'flex', gap: 12, alignItems: 'flex-start',
-                    background: !notif.read ? 'rgba(59,123,248,0.03)' : 'transparent',
-                  }}>
-                    <div style={{
-                      width: 7, height: 7, borderRadius: '50%',
-                      background: colors[notif.type], flexShrink: 0, marginTop: 5,
-                    }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--navy)', marginBottom: 2 }}>{notif.title}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--slate)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{notif.message}</div>
-                      <div style={{ fontSize: 11, color: 'var(--slate-light)', marginTop: 3 }}>{notif.time}</div>
+                    background: !notif.read ? 'rgba(37,99,235,0.02)' : 'transparent',
+                  }}
+                >
+                  <div style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: notifColors[notif.type] ?? '#94a3b8',
+                    flexShrink: 0,
+                    marginTop: 5,
+                  }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-text-primary)' }}>{notif.title}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {notif.message}
                     </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>{notif.time}</div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 
-      {/* Department table snippet */}
-      <Card>
-        <div style={{
-          padding: '16px 20px', borderBottom: '1px solid var(--border)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--navy)' }}>Department Status Summary</div>
+      {/* Department table */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Department status</span>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginLeft: 8 }}>
+              {compliantDepts} of {departments.length} compliant
+            </span>
+          </div>
           <button
             onClick={() => onNavigate('compliance')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              background: 'var(--sky)', border: '1px solid var(--border)',
-              borderRadius: 6, padding: '6px 12px', fontSize: 12, color: 'var(--blue)', fontWeight: 500,
-            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2563eb', background: 'transparent', border: 'none', cursor: 'pointer' }}
           >
-            Full Tracking <ArrowRight size={12} />
+            Full tracking <ArrowRight size={12} />
           </button>
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
-              <tr style={{ background: 'var(--sky)' }}>
-                {['Department', 'Head', 'Assigned', 'Completed', 'Status', 'Last Update'].map(h => (
-                  <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11.5, fontWeight: 600, color: 'var(--slate)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+              <tr>
+                {['Department', 'Head', 'Assigned', 'Completed', 'Status', 'Last update'].map(h => (
+                  <th key={h} style={{
+                    padding: '9px 16px',
+                    textAlign: 'left',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: 'var(--color-text-secondary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    background: 'var(--color-background-secondary)',
+                    borderBottom: '1px solid var(--border)',
+                    whiteSpace: 'nowrap',
+                  }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {recentDepts.map((dept, i) => (
-                <tr key={dept.id} style={{ borderTop: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(235,241,255,0.3)' }}>
-                  <td style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--navy)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {dept.name}
+                <tr
+                  key={dept.id}
+                  style={{ borderBottom: i < recentDepts.length - 1 ? '1px solid var(--border)' : 'none', transition: 'background 0.1s', cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td style={{ padding: '11px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{dept.name}</span>
                       {OVERDUE_DEPT_IDS.has(dept.id) && (
-                        <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>OVERDUE</span>
+                        <span style={{ fontSize: 10, background: '#fef2f2', color: '#dc2626', padding: '1px 5px', borderRadius: 3, fontWeight: 600 }}>
+                          OVERDUE
+                        </span>
                       )}
                     </div>
                   </td>
-                  <td style={{ padding: '12px 20px', color: 'var(--slate)' }}>{dept.head}</td>
-                  <td style={{ padding: '12px 20px', fontFamily: "'DM Mono', monospace", color: 'var(--navy)' }}>{dept.assignedCount}</td>
-                  <td style={{ padding: '12px 20px', fontFamily: "'DM Mono', monospace", color: 'var(--navy)' }}>
-                    <span style={{ color: dept.completedCount === dept.assignedCount ? 'var(--emerald)' : 'var(--navy)' }}>
+                  <td style={{ padding: '11px 16px', color: 'var(--color-text-secondary)' }}>{dept.head}</td>
+                  <td style={{ padding: '11px 16px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-primary)' }}>{dept.assignedCount}</td>
+                  <td style={{ padding: '11px 16px', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ color: dept.completedCount === dept.assignedCount ? '#16a34a' : 'var(--color-text-primary)' }}>
                       {dept.completedCount}/{dept.assignedCount}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <ComplianceBadge status={OVERDUE_DEPT_IDS.has(dept.id) ? 'overdue' : dept.compliance} />
+                  <td style={{ padding: '11px 16px' }}>
+                    <CompliancePill status={OVERDUE_DEPT_IDS.has(dept.id) ? 'overdue' : dept.compliance} />
                   </td>
-                  <td style={{ padding: '12px 20px', color: 'var(--slate)', fontSize: 12 }}>{dept.lastUpdate}</td>
+                  <td style={{ padding: '11px 16px', color: 'var(--color-text-secondary)', fontSize: 12 }}>{dept.lastUpdate}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
+
     </div>
   );
 }

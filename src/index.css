@@ -24,6 +24,22 @@
   --shadow-lg: 0 8px 32px rgba(11,30,61,0.14);
   --radius: 10px;
   --radius-sm: 6px;
+
+  /* Surface / layout tokens */
+  --surface: #FFFFFF;
+  --color-text-primary: #0B1E3D;
+  --color-text-secondary: #64748B;
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: #EBF1FF;
+  --color-background-tertiary: #D6E0F5;
+  --color-border-primary: #2155CD;
+  --color-border-secondary: #C7D7F5;
+  --color-border-tertiary: #D6E0F5;
+  --font-mono: 'DM Mono', monospace;
+
+  /* Encoder sidebar active state — blue accent */
+  --accent: #2155CD;
+  --accent-soft: rgba(33, 85, 205, 0.08);
 }
 
 body {
